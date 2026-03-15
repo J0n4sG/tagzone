@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TAGZONE — Multiplayer Platformer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Rajdhani:wght@400;600;700&display=swap');
+
+  :root {
+    --neon: #00ffe7;
+    --hot: #ff2d6b;
+    --warn: #ffd600;
+    --bg: #0a0a12;
+    --panel: #12121e;
+    --border: #1e1e35;
+    --text: #e0e0ff;
+    --muted: #555577;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  #app { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+
+  /* ── SCREENS ── */
+  .screen { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+  .screen.active { display: flex; }
+
+  /* ── MENU ── */
+  #menu {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at 50% 30%, #1a0a2e 0%, #0a0a12 70%);
+  }
+
+  #menu::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,255,231,.03) 39px, rgba(0,255,231,.03) 40px),
+                repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,255,231,.03) 39px, rgba(0,255,231,.03) 40px);
+    pointer-events: none;
+  }
+
+  .logo {
+    font-family: 'Black Ops One', cursive;
+    font-size: clamp(3rem, 10vw, 7rem);
+    letter-spacing: 0.05em;
+    color: #fff;
+    text-shadow: 0 0 30px var(--neon), 0 0 80px var(--neon), 0 2px 0 #000;
+    margin-bottom: 0.2em;
+    position: relative;
+    z-index: 1;
+  }
+
+  .logo span { color: var(--hot); text-shadow: 0 0 30px var(--hot), 0 0 80px var(--hot); }
+
+  .tagline {
+    font-size: 1.1rem;
+    color: var(--muted);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 3rem;
+    position: relative; z-index: 1;
+  }
+
+  .menu-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    width: min(420px, 90vw);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    position: relative; z-index: 1;
+    box-shadow: 0 0 60px rgba(0,255,231,.05);
+  }
+
+  .field-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.25rem;
+  }
+
+  input[type=text] {
+    width: 100%;
+    background: #0d0d1a;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding: 0.6rem 1rem;
+    outline: none;
+    transition: border-color .2s;
+  }
+  input[type=text]:focus { border-color: var(--neon); }
+
+  .btn {
+    padding: 0.7rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform .1s, box-shadow .2s, opacity .2s;
+    position: relative;
+  }
+  .btn:active { transform: scale(.97); }
+
+  .btn-primary {
+    background: var(--neon);
+    color: #000;
+    box-shadow: 0 0 20px rgba(0,255,231,.4);
+  }
+  .btn-primary:hover { box-shadow: 0 0 35px rgba(0,255,231,.7); }
+
+  .btn-secondary {
+    background: var(--hot);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(255,45,107,.3);
+  }
+  .btn-secondary:hover { box-shadow: 0 0 35px rgba(255,45,107,.6); }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-ghost:hover { border-color: var(--neon); color: var(--neon); }
+
+  .divider {
+    display: flex; align-items: center; gap: 1rem;
+    color: var(--muted); font-size: 0.8rem;
+  }
+  .divider::before, .divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* ── LOBBY ── */
+  #lobby {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+  }
+
+  .lobby-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    width: min(520px, 92vw);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .lobby-title {
+    font-family: 'Black Ops One', cursive;
+    font-size: 1.6rem;
+    color: var(--neon);
+    text-shadow: 0 0 15px var(--neon);
+  }
+
+  .code-display {
+    background: #0d0d1a;
+    border: 1px solid var(--neon);
+    border-radius: 6px;
+    padding: 0.6rem 1rem;
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--neon);
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+  }
+  .code-display::after {
+    content: 'Click to copy';
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 0.7rem; letter-spacing: 0.1em; color: var(--muted);
+  }
+
+  .player-list {
+    display: flex; flex-direction: column; gap: 0.5rem;
+    max-height: 160px; overflow-y: auto;
+  }
+
+  .player-entry {
+    display: flex; align-items: center; gap: 0.75rem;
+    background: #0d0d1a; border-radius: 6px; padding: 0.5rem 0.75rem;
+  }
+
+  .player-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .player-name { font-weight: 600; flex: 1; }
+  .player-badge {
+    font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 20px; background: #1e1e35; color: var(--muted);
+  }
+  .player-badge.host { background: rgba(255,214,0,.15); color: var(--warn); }
+
+  .select-row { display: flex; gap: 0.75rem; }
+
+  select {
+    flex: 1;
+    background: #0d0d1a;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0.5rem 0.75rem;
+    outline: none;
+    cursor: pointer;
+  }
+  select:focus { border-color: var(--neon); }
+
+  .status-msg {
+    font-size: 0.85rem; color: var(--muted); text-align: center;
+    min-height: 1.2em;
+  }
+
+  /* ── GAME ── */
+  #game {
+    flex-direction: column;
+    background: #000;
+  }
+
+  #hud {
+    height: 40px;
+    background: rgba(10,10,18,.95);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 1rem; gap: 1.5rem;
+    font-size: 0.85rem; font-weight: 600;
+    flex-shrink: 0; z-index: 10;
+  }
+
+  .hud-item { display: flex; align-items: center; gap: 0.4rem; }
+  .hud-label { color: var(--muted); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; }
+  .hud-val { color: var(--text); }
+  .hud-val.hot { color: var(--hot); }
+  .hud-val.neon { color: var(--neon); }
+  .hud-sep { width: 1px; height: 20px; background: var(--border); margin: 0 0.5rem; }
+
+  #timer-display {
+    font-family: 'Black Ops One', cursive;
+    font-size: 1.2rem;
+    margin-left: auto;
+  }
+  #timer-display.urgent { color: var(--hot); animation: blink .5s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  #canvas-wrap {
+    flex: 1; position: relative; overflow: hidden;
+  }
+
+  canvas { display: block; }
+
+  /* ── OVERLAY ── */
+  #overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,.8);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    gap: 1.5rem;
+  }
+  #overlay.show { display: flex; }
+
+  .overlay-title {
+    font-family: 'Black Ops One', cursive;
+    font-size: clamp(2rem, 6vw, 4rem);
+    text-align: center;
+  }
+
+  .overlay-sub { font-size: 1.1rem; color: var(--muted); }
+
+  .score-list {
+    display: flex; flex-direction: column; gap: 0.5rem;
+    min-width: 280px;
+  }
+
+  .score-row {
+    display: flex; align-items: center; gap: 0.75rem;
+    background: rgba(18,18,30,.9); border-radius: 6px; padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+  }
+
+  .rank { font-family: 'Black Ops One',cursive; font-size: 1.2rem; width: 1.5rem; text-align: center; }
+
+  /* ── KEYS HINT ── */
+  .keys-hint {
+    position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 0.5rem; z-index: 5; opacity: .6;
+    font-size: 0.75rem;
+  }
+  .key {
+    background: #1e1e35; border: 1px solid #333; border-radius: 4px;
+    padding: 2px 7px;
+  }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+    background: var(--panel); border: 1px solid var(--neon);
+    border-radius: 6px; padding: 0.5rem 1.2rem;
+    font-weight: 600; font-size: 0.9rem;
+    color: var(--neon); z-index: 100;
+    opacity: 0; transition: opacity .3s;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+
+  /* ── MOBILE DPAD ── */
+  #dpad {
+    display: none;
+    position: fixed; bottom: 20px; left: 20px;
+    gap: 4px; z-index: 15;
+  }
+  @media (pointer: coarse) { #dpad { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(2, 48px); } }
+  .dpad-btn {
+    background: rgba(0,255,231,.15); border: 1px solid rgba(0,255,231,.3);
+    border-radius: 6px; color: var(--neon);
+    font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  .dpad-btn:active { background: rgba(0,255,231,.35); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ═══════ MENU ═══════ -->
+<div id="menu" class="screen active">
+  <div class="logo">TAG<span>ZONE</span></div>
+  <div class="tagline">Multiplayer Platformer Tag</div>
+  <div class="menu-box">
+    <div>
+      <div class="field-label">Your Name</div>
+      <input type="text" id="playerName" placeholder="Enter nickname…" maxlength="16" value="">
+    </div>
+    <button class="btn btn-primary" id="hostBtn">⚡ Host a Room</button>
+    <div class="divider">or join existing</div>
+    <div>
+      <div class="field-label">Room Code</div>
+      <input type="text" id="joinCode" placeholder="e.g. ROCKET42" maxlength="12">
+    </div>
+    <button class="btn btn-secondary" id="joinBtn">🎯 Join Room</button>
+    <div class="status-msg" id="menuStatus"></div>
+  </div>
+</div>
+
+<!-- ═══════ LOBBY ═══════ -->
+<div id="lobby" class="screen">
+  <div class="lobby-box">
+    <div class="lobby-title" id="lobbyTitle">Waiting for players…</div>
+
+    <div id="roomCodeWrap">
+      <div class="field-label">Room Code — Share with friends</div>
+      <div class="code-display" id="roomCodeDisplay" onclick="copyCode()">—</div>
+    </div>
+
+    <div>
+      <div class="field-label">Players (<span id="playerCount">0</span>/8)</div>
+      <div class="player-list" id="playerList"></div>
+    </div>
+
+    <div class="select-row" id="hostOptions">
+      <div style="flex:1">
+        <div class="field-label">Map</div>
+        <select id="mapSelect">
+          <option value="0">🏙️ City Rooftops</option>
+          <option value="1">🌿 Jungle Ruins</option>
+          <option value="2">❄️ Ice Caves</option>
+          <option value="3">🔥 Volcano Lair</option>
+          <option value="4">🌌 Space Station</option>
+          <option value="5">🏚️ Haunted House</option>
+        </select>
+      </div>
+      <div style="flex:1">
+        <div class="field-label">Mode</div>
+        <select id="modeSelect">
+          <option value="classic">Classic Tag</option>
+          <option value="freeze">Freeze Tag</option>
+          <option value="infection">Infection</option>
+          <option value="survival">Last Survivor</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="status-msg" id="lobbyStatus">Waiting for host to start…</div>
+
+    <div style="display:flex;gap:.75rem">
+      <button class="btn btn-ghost" style="flex:1" onclick="leaveRoom()">← Leave</button>
+      <button class="btn btn-primary" style="flex:1" id="startBtn">Start Game ▶</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ GAME ═══════ -->
+<div id="game" class="screen">
+  <div id="hud">
+    <div class="hud-item">
+      <span class="hud-label">Map</span>
+      <span class="hud-val neon" id="hudMap">—</span>
+    </div>
+    <div class="hud-sep"></div>
+    <div class="hud-item">
+      <span class="hud-label">Mode</span>
+      <span class="hud-val" id="hudMode">—</span>
+    </div>
+    <div class="hud-sep"></div>
+    <div class="hud-item">
+      <span class="hud-label">You are</span>
+      <span class="hud-val hot" id="hudRole">—</span>
+    </div>
+    <div class="hud-sep"></div>
+    <div class="hud-item">
+      <span class="hud-label">Tagged</span>
+      <span class="hud-val" id="hudTagged">0</span>
+    </div>
+    <div id="timer-display" id="hudTimer">2:00</div>
+  </div>
+
+  <div id="canvas-wrap">
+    <canvas id="canvas"></canvas>
+    <div class="keys-hint">
+      <span class="key">A</span><span class="key">D</span> Move
+      <span class="key">W / Space</span> Jump
+      <span class="key">Shift</span> Dash
+    </div>
+    <div id="overlay">
+      <div class="overlay-title" id="overlayTitle">GAME OVER</div>
+      <div class="overlay-sub" id="overlaySub">Round Results</div>
+      <div class="score-list" id="scoreList"></div>
+      <div style="display:flex;gap:.75rem;margin-top:.5rem">
+        <button class="btn btn-ghost" onclick="leaveRoom()">Leave</button>
+        <button class="btn btn-primary" id="playAgainBtn" onclick="goToLobby()">Play Again</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile D-pad -->
+  <div id="dpad">
+    <div></div>
+    <div class="dpad-btn" id="dUp" ontouchstart="mobileKey('up',true)" ontouchend="mobileKey('up',false)">▲</div>
+    <div></div>
+    <div class="dpad-btn" id="dLeft" ontouchstart="mobileKey('left',true)" ontouchend="mobileKey('left',false)">◀</div>
+    <div class="dpad-btn" id="dDown" ontouchstart="mobileKey('down',true)" ontouchend="mobileKey('down',false)">▼</div>
+    <div class="dpad-btn" id="dRight" ontouchstart="mobileKey('right',true)" ontouchend="mobileKey('right',false)">▶</div>
+  </div>
+</div>
+
+</div><!-- /app -->
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  TAGZONE — Multiplayer Platformer Tag
+//  Architecture: PeerJS mesh. Host is authoritative.
+// ═══════════════════════════════════════════════════════
+
+// ── CONSTANTS ──
+const GRAVITY   = 0.55;
+const FRICTION  = 0.82;
+const MOVE_SPD  = 4.2;
+const JUMP_SPD  = -12.5;
+const DASH_SPD  = 11;
+const DASH_CD   = 90;  // frames
+const TAG_DIST  = 38;
+const TAG_CD    = 60;
+const GAME_TIME = 120; // seconds
+
+const PLAYER_COLORS = [
+  '#00ffe7','#ff2d6b','#ffd600','#7c4dff',
+  '#ff6d00','#00e676','#ff4081','#40c4ff'
+];
+
+// ── MAP DEFINITIONS ──
+const MAPS = [
+  // 0: City Rooftops
+  {
+    name: 'City Rooftops',
+    bg: ['#0a0a1a','#0f0f2a'],
+    accent: '#00ffe7',
+    platforms: [
+      {x:0,   y:520, w:200, h:20},
+      {x:240, y:520, w:180, h:20},
+      {x:460, y:520, w:200, h:20},
+      {x:700, y:520, w:180, h:20},
+      {x:0,   y:380, w:120, h:15},
+      {x:180, y:340, w:100, h:15},
+      {x:340, y:300, w:120, h:15},
+      {x:520, y:350, w:100, h:15},
+      {x:680, y:310, w:120, h:15},
+      {x:80,  y:220, w:80,  h:15},
+      {x:300, y:180, w:120, h:15},
+      {x:540, y:200, w:80,  h:15},
+      {x:400, y:100, w:100, h:15},
+    ],
+    spawnPoints: [{x:50,y:490},{x:280,y:490},{x:500,y:490},{x:740,y:490},{x:100,y:350},{x:350,y:270},{x:600,y:320}]
+  },
+  // 1: Jungle Ruins
+  {
+    name: 'Jungle Ruins',
+    bg: ['#051a05','#0a2a0a'],
+    accent: '#00e676',
+    platforms: [
+      {x:0,   y:520, w:160, h:20},
+      {x:200, y:480, w:100, h:20},
+      {x:360, y:520, w:160, h:20},
+      {x:560, y:480, w:100, h:20},
+      {x:700, y:520, w:180, h:20},
+      {x:60,  y:390, w:80,  h:20},
+      {x:220, y:360, w:120, h:20},
+      {x:420, y:380, w:80,  h:20},
+      {x:580, y:360, w:120, h:20},
+      {x:120, y:260, w:100, h:20},
+      {x:320, y:240, w:80,  h:20},
+      {x:480, y:260, w:100, h:20},
+      {x:650, y:240, w:80,  h:20},
+      {x:240, y:140, w:160, h:20},
+    ],
+    spawnPoints: [{x:20,y:490},{x:250,y:450},{x:400,y:490},{x:620,y:450},{x:80,y:360},{x:350,y:350},{x:600,y:330}]
+  },
+  // 2: Ice Caves
+  {
+    name: 'Ice Caves',
+    bg: ['#050a1a','#0a152a'],
+    accent: '#40c4ff',
+    platforms: [
+      {x:0,   y:540, w:880, h:20},
+      {x:100, y:430, w:120, h:15},
+      {x:300, y:390, w:80,  h:15},
+      {x:500, y:420, w:120, h:15},
+      {x:680, y:390, w:80,  h:15},
+      {x:50,  y:300, w:80,  h:15},
+      {x:220, y:270, w:120, h:15},
+      {x:440, y:290, w:80,  h:15},
+      {x:600, y:270, w:120, h:15},
+      {x:150, y:180, w:80,  h:15},
+      {x:380, y:170, w:120, h:15},
+      {x:640, y:185, w:80,  h:15},
+      {x:300, y:80,  w:100, h:15},
+    ],
+    spawnPoints: [{x:50,y:510},{x:200,y:510},{x:400,y:510},{x:600,y:510},{x:120,y:400},{x:330,y:360},{x:550,y:390}]
+  },
+  // 3: Volcano Lair
+  {
+    name: 'Volcano Lair',
+    bg: ['#1a0500','#2a0a00'],
+    accent: '#ff6d00',
+    platforms: [
+      {x:0,   y:540, w:200, h:20},
+      {x:680, y:540, w:200, h:20},
+      {x:250, y:500, w:80,  h:20, lava:true},
+      {x:450, y:500, w:80,  h:20, lava:true},
+      {x:100, y:410, w:100, h:15},
+      {x:300, y:380, w:120, h:15},
+      {x:480, y:370, w:100, h:15},
+      {x:660, y:410, w:100, h:15},
+      {x:180, y:290, w:80,  h:15},
+      {x:380, y:270, w:80,  h:15},
+      {x:560, y:285, w:80,  h:15},
+      {x:280, y:175, w:120, h:15},
+      {x:480, y:175, w:100, h:15},
+      {x:350, y:90,  w:80,  h:15},
+    ],
+    spawnPoints: [{x:30,y:510},{x:720,y:510},{x:120,y:380},{x:330,y:350},{x:510,y:340},{x:290,y:250},{x:380,y:160}]
+  },
+  // 4: Space Station
+  {
+    name: 'Space Station',
+    bg: ['#000008','#000015'],
+    accent: '#7c4dff',
+    platforms: [
+      {x:0,   y:540, w:150, h:20},
+      {x:200, y:540, w:150, h:20},
+      {x:400, y:540, w:100, h:20},
+      {x:560, y:540, w:200, h:20},
+      {x:50,  y:440, w:80,  h:15},
+      {x:220, y:410, w:80,  h:15},
+      {x:380, y:430, w:80,  h:15},
+      {x:560, y:430, w:80,  h:15},
+      {x:700, y:410, w:80,  h:15},
+      {x:120, y:320, w:100, h:15},
+      {x:320, y:300, w:80,  h:15},
+      {x:480, y:310, w:100, h:15},
+      {x:660, y:310, w:80,  h:15},
+      {x:0,   y:200, w:80,  h:15},
+      {x:200, y:190, w:120, h:15},
+      {x:440, y:200, w:80,  h:15},
+      {x:620, y:190, w:120, h:15},
+      {x:300, y:100, w:200, h:15},
+    ],
+    spawnPoints: [{x:20,y:510},{x:250,y:510},{x:420,y:510},{x:600,y:510},{x:100,y:410},{x:360,y:400},{x:620,y:400}]
+  },
+  // 5: Haunted House
+  {
+    name: 'Haunted House',
+    bg: ['#08060a','#100c15'],
+    accent: '#ff4081',
+    platforms: [
+      {x:0,   y:540, w:880, h:20},
+      {x:50,  y:440, w:160, h:15},
+      {x:300, y:460, w:80,  h:15},
+      {x:500, y:440, w:160, h:15},
+      {x:150, y:350, w:100, h:15},
+      {x:340, y:360, w:100, h:15},
+      {x:560, y:350, w:100, h:15},
+      {x:700, y:360, w:80,  h:15},
+      {x:60,  y:260, w:120, h:15},
+      {x:280, y:250, w:80,  h:15},
+      {x:440, y:255, w:80,  h:15},
+      {x:620, y:260, w:120, h:15},
+      {x:160, y:160, w:100, h:15},
+      {x:360, y:150, w:120, h:15},
+      {x:580, y:155, w:100, h:15},
+      {x:300, y:65,  w:180, h:15},
+    ],
+    spawnPoints: [{x:20,y:510},{x:200,y:510},{x:400,y:510},{x:700,y:510},{x:80,y:320},{x:360,y:330},{x:640,y:320}]
+  }
+];
+
+// ── STATE ──
+let peer, connections = {}, myId, isHost = false;
+let myName = 'Player';
+let roomCode = '';
+let players = {};      // {id: playerState}
+let gameState = null;  // shared game state
+let localInput = {left:false, right:false, up:false, down:false, dash:false};
+let gameLoop = null;
+let mapIndex = 0, gameMode = 'classic';
+let canvasW, canvasH;
+let camX = 0;
+let gameRunning = false;
+
+// ── UTILS ──
+function showToast(msg, dur=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function rand(a,b) { return Math.floor(Math.random()*(b-a)+a); }
+
+function generateCode() {
+  const words = ['ROCKET','PIXEL','TURBO','BLAZE','STORM','NEON','GHOST','HYPER','NOVA','FUSE'];
+  return words[rand(0,words.length)] + rand(10,99);
+}
+
+// ── PEER SETUP ──
+function initPeer(id) {
+  return new Promise((res, rej) => {
+    const p = new Peer(id, {
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' }
+        ]
+      }
+    });
+    p.on('open', () => res(p));
+    p.on('error', e => {
+      if (e.type === 'unavailable-id') rej(new Error('code-taken'));
+      else rej(e);
+    });
+  });
+}
+
+// ── HOST ──
+async function hostRoom() {
+  const name = document.getElementById('playerName').value.trim() || 'Player';
+  myName = name;
+  setStatus('menu', 'Initializing…');
+  roomCode = generateCode();
+  myId = 'TZ-' + roomCode;
+  try {
+    peer = await initPeer(myId);
+  } catch(e) {
+    if(e.message==='code-taken') {
+      roomCode = generateCode();
+      myId = 'TZ-' + roomCode;
+      peer = await initPeer(myId);
+    } else { setStatus('menu','Connection error. Try again.'); return; }
+  }
+  isHost = true;
+  connections = {};
+  players = {};
+
+  const myColor = PLAYER_COLORS[0];
+  players[myId] = createPlayerState(myId, myName, myColor, 0);
+
+  peer.on('connection', conn => {
+    conn.on('open', () => {
+      const pid = conn.peer;
+      connections[pid] = conn;
+      conn.on('data', d => handleGuestData(pid, d));
+      conn.on('close', () => removePlayer(pid));
+      // Send full state
+      const colorIdx = Object.keys(players).length;
+      const pColor = PLAYER_COLORS[colorIdx % PLAYER_COLORS.length];
+      // wait for guest to introduce itself
+    });
+  });
+
+  showScreen('lobby');
+  document.getElementById('roomCodeDisplay').textContent = roomCode;
+  document.getElementById('lobbyTitle').textContent = '⚡ Hosting — ' + roomCode;
+  document.getElementById('hostOptions').style.display = 'flex';
+  document.getElementById('startBtn').onclick = startGame;
+  setStatus('lobby', 'Share the code above with friends!');
+  renderPlayerList();
+}
+
+// ── JOIN ──
+async function joinRoom() {
+  const name = document.getElementById('playerName').value.trim() || 'Player';
+  myName = name;
+  const code = document.getElementById('joinCode').value.trim().toUpperCase();
+  if (!code) { setStatus('menu','Enter a room code.'); return; }
+  setStatus('menu', 'Connecting…');
+  myId = 'TZ-' + code + '-' + rand(1000,9999);
+  try {
+    peer = await initPeer(myId);
+  } catch(e) { setStatus('menu','Failed to connect. Try again.'); return; }
+
+  const hostId = 'TZ-' + code;
+  const conn = peer.connect(hostId);
+  connections[hostId] = conn;
+
+  conn.on('open', () => {
+    setStatus('menu','');
+    conn.send({type:'join', name: myName, id: myId});
+    showScreen('lobby');
+    document.getElementById('roomCodeDisplay').textContent = code;
+    document.getElementById('lobbyTitle').textContent = '🎮 Room — ' + code;
+    document.getElementById('hostOptions').style.display = 'none';
+    document.getElementById('startBtn').style.display = 'none';
+    setStatus('lobby','Waiting for host to start…');
+  });
+
+  conn.on('data', d => handleHostData(d));
+  conn.on('close', () => { showToast('Disconnected from host'); leaveRoom(); });
+  conn.on('error', () => { setStatus('menu','Could not reach that room.'); showScreen('menu'); });
+}
+
+// ── MESSAGING ──
+function broadcast(data, exceptId=null) {
+  for (const [id, c] of Object.entries(connections)) {
+    if (id !== exceptId && c.open) c.send(data);
+  }
+}
+
+function sendToHost(data) {
+  const hostConn = Object.values(connections)[0];
+  if (hostConn && hostConn.open) hostConn.send(data);
+}
+
+// ── HOST DATA HANDLER ──
+function handleGuestData(pid, data) {
+  if (data.type === 'join') {
+    const colorIdx = Object.keys(players).length;
+    const pColor = PLAYER_COLORS[colorIdx % PLAYER_COLORS.length];
+    players[pid] = createPlayerState(pid, data.name, pColor, colorIdx);
+    // Send current state to newcomer
+    connections[pid].send({type:'welcome', players, mapIndex, gameMode, myId: pid});
+    // Broadcast to others
+    broadcast({type:'playerJoined', id:pid, playerState: players[pid]}, pid);
+    renderPlayerList();
+    setStatus('lobby', Object.keys(players).length + ' player(s) connected.');
+  }
+  if (data.type === 'input' && gameRunning) {
+    if (players[pid]) {
+      players[pid].input = data.input;
+    }
+  }
+  if (data.type === 'requestState') {
+    connections[pid].send({type:'fullState', players, mapIndex, gameMode});
+  }
+}
+
+// ── GUEST DATA HANDLER ──
+function handleHostData(data) {
+  if (data.type === 'welcome') {
+    players = data.players;
+    myId = data.myId;
+    mapIndex = data.mapIndex;
+    gameMode = data.gameMode;
+    renderPlayerList();
+  }
+  if (data.type === 'playerJoined') {
+    players[data.id] = data.playerState;
+    renderPlayerList();
+    showToast(data.playerState.name + ' joined!');
+  }
+  if (data.type === 'playerLeft') {
+    delete players[data.id];
+    renderPlayerList();
+  }
+  if (data.type === 'gameStart') {
+    mapIndex = data.mapIndex;
+    gameMode = data.gameMode;
+    players = data.players;
+    startLocalGame();
+  }
+  if (data.type === 'gameState' && gameRunning) {
+    // Apply authoritative state
+    for (const [id, ps] of Object.entries(data.players)) {
+      if (id !== myId && players[id]) {
+        Object.assign(players[id], ps);
+      }
+    }
+    if (data.gameTime !== undefined) gameState.timeLeft = data.gameTime;
+    if (data.tagged !== undefined) gameState.tagged = data.tagged;
+  }
+  if (data.type === 'gameOver') {
+    endGame(data.results);
+  }
+}
+
+function removePlayer(pid) {
+  delete players[pid];
+  delete connections[pid];
+  broadcast({type:'playerLeft', id:pid});
+  renderPlayerList();
+  if (gameRunning) {
+    checkGameOver();
+  }
+}
+
+// ── PLAYER STATE ──
+function createPlayerState(id, name, color, idx) {
+  return {
+    id, name, color,
+    x: 50 + idx*100, y: 400,
+    vx: 0, vy: 0,
+    w: 24, h: 32,
+    onGround: false,
+    tagged: false,    // is this player "it" (the tagger)?
+    frozen: false,    // freeze tag
+    alive: true,      // survival mode
+    tagCount: 0,
+    dashCd: 0,
+    tagCd: 0,
+    input: {left:false,right:false,up:false,dash:false},
+    facing: 1,
+    animFrame: 0,
+    animTick: 0,
+  };
+}
+
+// ── LOBBY UI ──
+function renderPlayerList() {
+  const list = document.getElementById('playerList');
+  const cnt = document.getElementById('playerCount');
+  list.innerHTML = '';
+  cnt.textContent = Object.keys(players).length;
+  for (const [id, p] of Object.entries(players)) {
+    const div = document.createElement('div');
+    div.className = 'player-entry';
+    div.innerHTML = `
+      <div class="player-dot" style="background:${p.color};box-shadow:0 0 8px ${p.color}"></div>
+      <div class="player-name">${p.name}${id===myId?' (you)':''}</div>
+      ${(isHost && id===myId)||id==='TZ-'+roomCode ? '<div class="player-badge host">HOST</div>' : '<div class="player-badge">Player</div>'}
+    `;
+    list.appendChild(div);
+  }
+}
+
+function setStatus(screen, msg) {
+  document.getElementById(screen+'Status').textContent = msg;
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(roomCode).then(()=>showToast('Code copied!')).catch(()=>{});
+}
+
+function leaveRoom() {
+  gameRunning = false;
+  if(gameLoop) { clearInterval(gameLoop); gameLoop=null; }
+  if(peer) { peer.destroy(); peer=null; }
+  players={};connections={};
+  showScreen('menu');
+  document.getElementById('startBtn').style.display='';
+  document.getElementById('hostOptions').style.display='flex';
+}
+
+function goToLobby() {
+  gameRunning = false;
+  if(gameLoop) { clearInterval(gameLoop); gameLoop=null; }
+  document.getElementById('overlay').classList.remove('show');
+  showScreen('lobby');
+  renderPlayerList();
+  if(isHost) {
+    setStatus('lobby','Start a new round!');
+    document.getElementById('startBtn').onclick = startGame;
+  } else {
+    setStatus('lobby','Waiting for host to start…');
+  }
+}
+
+// ── START GAME (HOST) ──
+function startGame() {
+  if(Object.keys(players).length < 1) { setStatus('lobby','Need at least 1 player.'); return; }
+  mapIndex = parseInt(document.getElementById('mapSelect').value);
+  gameMode = document.getElementById('modeSelect').value;
+
+  // assign initial tagged
+  const ids = Object.keys(players);
+  const taggedId = ids[rand(0, ids.length)];
+
+  for (const [id, p] of Object.entries(players)) {
+    const map = MAPS[mapIndex];
+    const sp = map.spawnPoints[Object.keys(players).indexOf(id) % map.spawnPoints.length];
+    p.x = sp.x; p.y = sp.y - 40;
+    p.vx=0; p.vy=0; p.tagged=(id===taggedId);
+    p.frozen=false; p.alive=true; p.tagCount=0;
+    p.dashCd=0; p.tagCd=0;
+  }
+
+  broadcast({type:'gameStart', mapIndex, gameMode, players});
+  startLocalGame();
+}
+
+// ── START LOCAL GAME ──
+function startLocalGame() {
+  showScreen('game');
+  const canvas = document.getElementById('canvas');
+  const wrap = document.getElementById('canvas-wrap');
+  canvasW = wrap.clientWidth;
+  canvasH = wrap.clientHeight;
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+
+  gameState = {
+    timeLeft: GAME_TIME,
+    timer: 0,
+    tagged: Object.keys(players).find(id=>players[id].tagged) || Object.keys(players)[0],
+    over: false,
+  };
+
+  document.getElementById('hudMap').textContent = MAPS[mapIndex].name;
+  document.getElementById('hudMode').textContent = gameModeLabel(gameMode);
+
+  gameRunning = true;
+  document.getElementById('overlay').classList.remove('show');
+
+  if(gameLoop) clearInterval(gameLoop);
+  gameLoop = setInterval(tick, 1000/60);
+}
+
+function gameModeLabel(m) {
+  return {classic:'Classic Tag',freeze:'Freeze Tag',infection:'Infection',survival:'Last Survivor'}[m]||m;
+}
+
+// ── GAME TICK ──
+function tick() {
+  if (!gameRunning) return;
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // Apply local input to my player
+  if (players[myId]) players[myId].input = {...localInput};
+
+  // HOST: simulate all players
+  if (isHost) {
+    simulatePlayers();
+    // Broadcast authoritative state every 2 frames
+    gameState.timer++;
+    if (gameState.timer % 2 === 0) {
+      // Slim state for broadcast
+      const slim = {};
+      for (const [id, p] of Object.entries(players)) {
+        slim[id] = {x:p.x,y:p.y,vx:p.vx,vy:p.vy,tagged:p.tagged,frozen:p.frozen,alive:p.alive,tagCount:p.tagCount,facing:p.facing,onGround:p.onGround,animFrame:p.animFrame};
+      }
+      broadcast({type:'gameState', players:slim, gameTime:gameState.timeLeft, tagged:gameState.tagged});
+    }
+    // Timer
+    if (gameState.timer % 60 === 0 && gameState.timeLeft > 0) {
+      gameState.timeLeft--;
+      if (gameState.timeLeft <= 0) {
+        endGame(buildResults());
+        broadcast({type:'gameOver', results:buildResults()});
+      }
+    }
+    checkGameOver();
+  } else {
+    // GUEST: predict own movement, others are server-authoritative
+    if (players[myId]) simulateSinglePlayer(players[myId]);
+  }
+
+  render(ctx);
+  updateHUD();
+}
+
+// ── PHYSICS / SIMULATION ──
+const MAP_WORLD_W = 880;
+const MAP_WORLD_H = 580;
+
+function simulatePlayers() {
+  const plats = MAPS[mapIndex].platforms;
+  for (const p of Object.values(players)) {
+    if (!p.alive) continue;
+    simulateSinglePlayer(p);
+  }
+  // Check tags
+  handleTagging();
+}
+
+function simulateSinglePlayer(p) {
+  const inp = p.input || {};
+  const plats = MAPS[mapIndex].platforms;
+
+  // Dash cooldown
+  if (p.dashCd > 0) p.dashCd--;
+  if (p.tagCd > 0) p.tagCd--;
+
+  if (p.frozen) return; // freeze tag: can't move
+
+  // Move
+  if (inp.left)  { p.vx -= MOVE_SPD * 0.4; p.facing = -1; }
+  if (inp.right) { p.vx += MOVE_SPD * 0.4; p.facing =  1; }
+
+  // Dash
+  if (inp.dash && p.dashCd <= 0) {
+    p.vx += p.facing * DASH_SPD;
+    p.dashCd = DASH_CD;
+  }
+
+  // Jump
+  if (inp.up && p.onGround) {
+    p.vy = JUMP_SPD;
+    p.onGround = false;
+  }
+
+  // Gravity & friction
+  p.vy += GRAVITY;
+  p.vx *= FRICTION;
+  if (Math.abs(p.vx) > 14) p.vx = Math.sign(p.vx) * 14;
+  if (p.vy > 18) p.vy = 18;
+
+  p.x += p.vx;
+  p.y += p.vy;
+
+  // Horizontal wrap
+  if (p.x + p.w < 0) p.x = MAP_WORLD_W;
+  if (p.x > MAP_WORLD_W) p.x = -p.w;
+
+  // Collide platforms
+  p.onGround = false;
+  for (const pl of plats) {
+    // top collision
+    if (p.x + p.w > pl.x && p.x < pl.x + pl.w &&
+        p.y + p.h > pl.y && p.y + p.h < pl.y + pl.h + 12 && p.vy >= 0) {
+      p.y = pl.y - p.h;
+      p.vy = 0;
+      p.onGround = true;
+      if (pl.lava) {
+        // Lava platform: bounce up (mode: survival kills)
+        p.vy = JUMP_SPD * 0.7;
+        if (gameMode === 'survival') { p.alive = false; }
+      }
+    }
+  }
+
+  // Floor
+  if (p.y + p.h > MAP_WORLD_H) {
+    p.y = MAP_WORLD_H - p.h;
+    p.vy = 0;
+    p.onGround = true;
+    if (gameMode === 'survival') {
+      p.alive = false;
+      p.y = -9999;
+    }
+  }
+
+  // Ceiling
+  if (p.y < 0) { p.y = 0; p.vy = Math.abs(p.vy); }
+
+  // Anim
+  p.animTick = (p.animTick||0) + 1;
+  if (Math.abs(p.vx) > 0.5 && p.onGround) {
+    if (p.animTick % 8 === 0) p.animFrame = ((p.animFrame||0)+1) % 4;
+  } else { p.animFrame = 0; }
+}
+
+function handleTagging() {
+  if (gameMode === 'classic') {
+    const tagger = players[gameState.tagged];
+    if (!tagger || !tagger.alive) {
+      // Pick new tagger
+      const alive = Object.values(players).filter(p=>p.alive);
+      if (alive.length) {
+        gameState.tagged = alive[0].id;
+        alive[0].tagged = true;
+      }
+      return;
+    }
+    if (tagger.tagCd > 0) return;
+    for (const [id, p] of Object.entries(players)) {
+      if (id === gameState.tagged || !p.alive) continue;
+      const dx = (tagger.x+tagger.w/2)-(p.x+p.w/2);
+      const dy = (tagger.y+tagger.h/2)-(p.y+p.h/2);
+      if (Math.sqrt(dx*dx+dy*dy) < TAG_DIST) {
+        // Tag!
+        tagger.tagged = false;
+        tagger.tagCd = TAG_CD;
+        tagger.tagCount++;
+        p.tagged = true;
+        gameState.tagged = id;
+      }
+    }
+  }
+
+  if (gameMode === 'freeze') {
+    const taggers = Object.values(players).filter(p=>p.tagged && p.alive);
+    for (const tagger of taggers) {
+      if (tagger.tagCd > 0) continue;
+      for (const [id, p] of Object.entries(players)) {
+        if (p.tagged || !p.alive || p.frozen) continue;
+        const dx=(tagger.x+tagger.w/2)-(p.x+p.w/2);
+        const dy=(tagger.y+tagger.h/2)-(p.y+p.h/2);
+        if (Math.sqrt(dx*dx+dy*dy) < TAG_DIST) {
+          p.frozen = true;
+          tagger.tagCd = TAG_CD;
+          tagger.tagCount++;
+        }
+      }
+      // Unfreeze: non-tagger touches frozen
+      for (const [fid, fp] of Object.entries(players)) {
+        if (!fp.frozen || fp.tagged) continue;
+        for (const [uid, up] of Object.entries(players)) {
+          if (up.tagged || up.frozen || !up.alive) continue;
+          const dx=(up.x+up.w/2)-(fp.x+fp.w/2);
+          const dy=(up.y+up.h/2)-(fp.y+fp.h/2);
+          if (Math.sqrt(dx*dx+dy*dy) < TAG_DIST) {
+            fp.frozen = false;
+          }
+        }
+      }
+    }
+  }
+
+  if (gameMode === 'infection') {
+    const infected = Object.values(players).filter(p=>p.tagged && p.alive);
+    for (const inf of infected) {
+      if (inf.tagCd > 0) continue;
+      for (const [id, p] of Object.entries(players)) {
+        if (p.tagged || !p.alive) continue;
+        const dx=(inf.x+inf.w/2)-(p.x+p.w/2);
+        const dy=(inf.y+inf.h/2)-(p.y+p.h/2);
+        if (Math.sqrt(dx*dx+dy*dy) < TAG_DIST) {
+          p.tagged = true;
+          inf.tagCd = TAG_CD;
+          inf.tagCount++;
+        }
+      }
+    }
+  }
+}
+
+function checkGameOver() {
+  if (!isHost || gameState.over) return;
+
+  if (gameMode === 'survival') {
+    const alive = Object.values(players).filter(p=>p.alive);
+    if (alive.length <= 1 && Object.keys(players).length > 1) {
+      gameState.over = true;
+      const results = buildResults();
+      endGame(results);
+      broadcast({type:'gameOver', results});
+    }
+  }
+
+  if (gameMode === 'infection') {
+    const healthy = Object.values(players).filter(p=>!p.tagged && p.alive);
+    if (healthy.length === 0 && Object.keys(players).length > 1) {
+      gameState.over = true;
+      const results = buildResults();
+      endGame(results);
+      broadcast({type:'gameOver', results});
+    }
+  }
+}
+
+function buildResults() {
+  return Object.values(players)
+    .map(p => ({id:p.id, name:p.name, color:p.color, tagCount:p.tagCount, tagged:p.tagged, alive:p.alive}))
+    .sort((a,b) => b.tagCount - a.tagCount);
+}
+
+function endGame(results) {
+  gameRunning = false;
+  if(gameLoop) { clearInterval(gameLoop); gameLoop=null; }
+  showResults(results);
+}
+
+function showResults(results) {
+  const ov = document.getElementById('overlay');
+  const title = document.getElementById('overlayTitle');
+  const sub = document.getElementById('overlaySub');
+  const list = document.getElementById('scoreList');
+
+  let titleText = 'TIME\'S UP!';
+  let subText = 'Round Over';
+
+  if (gameMode === 'survival') {
+    const survivor = results.find(r=>r.alive);
+    if (survivor) titleText = survivor.id===myId ? '🏆 YOU WIN!' : survivor.name+' WINS!';
+  } else if (gameMode === 'infection') {
+    const healthy = results.filter(r=>!r.tagged);
+    titleText = healthy.length===0 ? '☣️ ALL INFECTED!' : '🛡️ SURVIVORS WIN!';
+  }
+
+  title.textContent = titleText;
+  sub.textContent = subText;
+
+  list.innerHTML = results.map((r,i) => {
+    const medals = ['🥇','🥈','🥉'];
+    return `<div class="score-row">
+      <div class="rank">${medals[i]||i+1}</div>
+      <div class="player-dot" style="background:${r.color};border-radius:50%;width:12px;height:12px;flex-shrink:0;box-shadow:0 0 8px ${r.color}"></div>
+      <div style="flex:1;font-weight:600">${r.name}${r.id===myId?' (you)':''}</div>
+      <div style="color:var(--muted);font-size:.85rem">${r.tagCount} tags</div>
+    </div>`;
+  }).join('');
+
+  ov.classList.add('show');
+}
+
+// ── RENDERING ──
+function render(ctx) {
+  const W = canvasW, H = canvasH;
+  const map = MAPS[mapIndex];
+
+  // Camera follow local player
+  if (players[myId]) {
+    const me = players[myId];
+    const targetCamX = me.x - W/2 + me.w/2;
+    camX += (targetCamX - camX) * 0.12;
+    camX = Math.max(0, Math.min(MAP_WORLD_W - W, camX));
+    if (MAP_WORLD_W <= W) camX = 0;
+  }
+
+  // Background gradient
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, map.bg[0]);
+  grad.addColorStop(1, map.bg[1]);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,W,H);
+
+  // Star/particle BG
+  drawBackground(ctx, map, W, H);
+
+  ctx.save();
+  ctx.translate(-camX, 0);
+
+  // Platforms
+  for (const pl of map.platforms) {
+    if (pl.lava) {
+      const lg = ctx.createLinearGradient(pl.x, pl.y, pl.x, pl.y+pl.h);
+      lg.addColorStop(0,'#ff6d00');
+      lg.addColorStop(1,'#ff0000');
+      ctx.fillStyle = lg;
+      ctx.fillRect(pl.x, pl.y, pl.w, pl.h);
+      // Lava glow
+      ctx.shadowColor = '#ff6d00';
+      ctx.shadowBlur = 20;
+      ctx.fillRect(pl.x, pl.y, pl.w, 4);
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(pl.x, pl.y, pl.w, pl.h);
+      ctx.fillStyle = map.accent;
+      ctx.globalAlpha = 0.5;
+      ctx.fillRect(pl.x, pl.y, pl.w, 3);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Players
+  for (const p of Object.values(players)) {
+    drawPlayer(ctx, p, map);
+  }
+
+  ctx.restore();
+}
+
+function drawBackground(ctx, map, W, H) {
+  ctx.save();
+  ctx.globalAlpha = 0.4;
+  // Stars
+  const seed = mapIndex * 137;
+  for (let i = 0; i < 60; i++) {
+    const x = ((seed*i*7+i*113) % MAP_WORLD_W) - camX;
+    const y = ((seed*i*3+i*71) % (H-50));
+    if (x < 0 || x > W) continue;
+    const r = (i%3===0)?1.5:0.8;
+    ctx.fillStyle = map.accent;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawPlayer(ctx, p, map) {
+  const x = p.x, y = p.y, w = p.w, h = p.h;
+
+  ctx.save();
+
+  if (!p.alive) { ctx.restore(); return; }
+
+  const isIt = p.tagged;
+  const isFrozen = p.frozen;
+  const isMe = p.id === myId;
+
+  // Shadow
+  ctx.shadowColor = isIt ? '#ff2d6b' : p.color;
+  ctx.shadowBlur = isIt ? 25 : (isMe ? 18 : 10);
+
+  // Body
+  if (isFrozen) {
+    ctx.fillStyle = '#40c4ff';
+    ctx.globalAlpha = 0.7;
+  } else {
+    ctx.fillStyle = isIt ? '#ff2d6b' : p.color;
+  }
+
+  // Squash/stretch
+  const bob = Math.sin(Date.now()/120 + p.id.length) * (p.onGround ? 1 : 0);
+  const scaleX = 1 + (p.onGround && Math.abs(p.vx)>1 ? 0.05 : 0);
+  const scaleY = 1 - bob*0.02;
+
+  ctx.save();
+  ctx.translate(x + w/2, y + h/2);
+  ctx.scale(p.facing * scaleX, scaleY);
+
+  // Body rect with rounded corners
+  const bw = w, bh = h;
+  ctx.beginPath();
+  ctx.roundRect(-bw/2, -bh/2, bw, bh, 5);
+  ctx.fill();
+
+  // Eyes
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#000';
+  ctx.globalAlpha = 1;
+  const eyeY = -bh/2 + bh*0.25;
+  ctx.fillRect(3, eyeY, 5, 5);
+  ctx.fillRect(bw/2-8, eyeY, 5, 5);
+
+  // Eye shine
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(4, eyeY+1, 2, 2);
+  ctx.fillRect(bw/2-7, eyeY+1, 2, 2);
+
+  // Mouth (smile if runner, angry if tagger)
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  if (isIt) {
+    ctx.arc(0, bh*0.2, 5, 0, Math.PI, true);
+  } else {
+    ctx.arc(0, bh*0.15, 5, 0, Math.PI, false);
+  }
+  ctx.stroke();
+
+  ctx.restore();
+  ctx.restore();
+
+  // "IT" label
+  if (isIt) {
+    ctx.save();
+    ctx.font = 'bold 11px Rajdhani, sans-serif';
+    ctx.fillStyle = '#ff2d6b';
+    ctx.shadowColor = '#ff2d6b';
+    ctx.shadowBlur = 8;
+    ctx.textAlign = 'center';
+    ctx.fillText('IT', x + w/2, y - 8);
+    ctx.restore();
+  }
+
+  // Frozen indicator
+  if (isFrozen) {
+    ctx.save();
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('❄️', x + w/2, y - 6);
+    ctx.restore();
+  }
+
+  // Name tag
+  ctx.save();
+  ctx.font = '600 10px Rajdhani, sans-serif';
+  ctx.fillStyle = isMe ? '#ffffff' : 'rgba(255,255,255,0.6)';
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#000'; ctx.shadowBlur = 4;
+  ctx.fillText(p.name, x + w/2, y - (isIt ? 22 : 20));
+  ctx.restore();
+
+  // Dash trail
+  if (Math.abs(p.vx) > 8) {
+    ctx.save();
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(x - p.vx*0.5, y, w, h);
+    ctx.restore();
+  }
+}
+
+// ── HUD ──
+function updateHUD() {
+  const me = players[myId];
+  if (me) {
+    const roleEl = document.getElementById('hudRole');
+    if (gameMode==='freeze'||gameMode==='infection') {
+      roleEl.textContent = me.tagged ? 'TAGGER 😈' : (me.frozen?'FROZEN ❄️':'RUNNER 🏃');
+    } else if (gameMode==='survival') {
+      roleEl.textContent = me.alive ? 'ALIVE ✅' : 'ELIMINATED 💀';
+    } else {
+      roleEl.textContent = me.tagged ? 'YOU\'RE IT 😈' : 'RUNNER 🏃';
+    }
+    roleEl.className = 'hud-val' + (me.tagged?' hot':'');
+  }
+
+  const tagged = Object.values(players).filter(p=>p.tagged).length;
+  document.getElementById('hudTagged').textContent = tagged;
+
+  if (gameState) {
+    const t = Math.max(0, Math.floor(gameState.timeLeft));
+    const m = Math.floor(t/60), s = t%60;
+    const timerEl = document.getElementById('timer-display');
+    timerEl.textContent = m+':'+(s<10?'0':'')+s;
+    timerEl.className = 'hud-val'+(t<=10?' urgent':'');
+  }
+}
+
+// ── INPUT ──
+document.addEventListener('keydown', e => {
+  switch(e.code) {
+    case 'KeyA': case 'ArrowLeft':  localInput.left=true; break;
+    case 'KeyD': case 'ArrowRight': localInput.right=true; break;
+    case 'KeyW': case 'ArrowUp': case 'Space': localInput.up=true; break;
+    case 'ShiftLeft': case 'ShiftRight': localInput.dash=true; break;
+  }
+  if(['Space','ArrowUp','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight'].includes(e.code)) e.preventDefault();
+  // Send input to host
+  if (!isHost && gameRunning) sendToHost({type:'input', input:localInput});
+});
+
+document.addEventListener('keyup', e => {
+  switch(e.code) {
+    case 'KeyA': case 'ArrowLeft':  localInput.left=false; break;
+    case 'KeyD': case 'ArrowRight': localInput.right=false; break;
+    case 'KeyW': case 'ArrowUp': case 'Space': localInput.up=false; break;
+    case 'ShiftLeft': case 'ShiftRight': localInput.dash=false; break;
+  }
+  if (!isHost && gameRunning) sendToHost({type:'input', input:localInput});
+});
+
+// Mobile controls
+function mobileKey(key, down) {
+  if (key==='left')  localInput.left=down;
+  if (key==='right') localInput.right=down;
+  if (key==='up')    localInput.up=down;
+  if (!isHost && gameRunning) sendToHost({type:'input', input:localInput});
+}
+
+// ── BUTTON BINDINGS ──
+document.getElementById('hostBtn').onclick = hostRoom;
+document.getElementById('joinBtn').onclick = joinRoom;
+document.getElementById('joinCode').addEventListener('keydown', e => { if(e.key==='Enter') joinRoom(); });
+
+// Handle window resize
+window.addEventListener('resize', () => {
+  if (document.getElementById('game').classList.contains('active')) {
+    const wrap = document.getElementById('canvas-wrap');
+    const canvas = document.getElementById('canvas');
+    canvasW = wrap.clientWidth;
+    canvasH = wrap.clientHeight;
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+  }
+});
+</script>
+</body>
+</html>
